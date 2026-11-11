@@ -147,6 +147,13 @@ details.more p { font-size: 13px; color: var(--fg); margin: 8px 0 0; }
       </section>
 
       <section class="search">
+        <label class="eyebrow" for="qp">Buscar un predio</label>
+        <input id="qp" type="search" inputmode="numeric" autocomplete="off" placeholder="Número predial nuevo o anterior" disabled>
+        <div class="results" id="resp" hidden></div>
+        <p class="note" id="predios-estado" style="margin-top:5px">Cargando 11.814 predios…</p>
+      </section>
+
+      <section class="search">
         <label class="eyebrow" for="qb">Ir a un barrio</label>
         <input id="qb" type="search" autocomplete="off" placeholder="Nombre del barrio">
         <div class="results" id="resb" hidden></div>
@@ -218,6 +225,27 @@ details.more p { font-size: 13px; color: var(--fg); margin: 8px 0 0; }
   function inFeat(lng, lat, f) { return f.geometry.coordinates.some(poly => inRing(lng, lat, poly[0]) && !poly.slice(1).some(h => inRing(lng, lat, h))); }
   const hit = (fc, ll) => fc.features.find(f => inFeat(ll.lng, ll.lat, f));
 
+  /* ---------- Predios ---------- */
+  let PRED = null, PBOX = [], predL = null, predSel = null;
+  function bboxOf(f) { let a = 180, b = 90, c = -180, d = -90; f.geometry.coordinates.forEach(p => p[0].forEach(([x, y]) => { if (x < a) a = x; if (y < b) b = y; if (x > c) c = x; if (y > d) d = y; })); return [a, b, c, d]; }
+  function predioEn(ll) {
+    if (!PRED) return null;
+    for (let i = 0; i < PRED.features.length; i++) { const bb = PBOX[i]; if (ll.lng < bb[0] || ll.lng > bb[2] || ll.lat < bb[1] || ll.lat > bb[3]) continue; if (inFeat(ll.lng, ll.lat, PRED.features[i])) return PRED.features[i]; }
+    return null;
+  }
+  function zonasDelPredio(f) {
+    // uso del suelo en el punto interior y en puntos cercanos a los vértices (desplazados hacia adentro)
+    const [px, py] = f.properties.p, cats = new Set();
+    const probe = (x, y) => { const u = hit(USOS, { lng: x, lat: y }); if (u) cats.add(u.properties.cat); };
+    probe(px, py);
+    f.geometry.coordinates.forEach(poly => poly[0].forEach(([x, y]) => probe(x + (px - x) * 0.2, y + (py - y) * 0.2)));
+    return [...cats];
+  }
+  function marcarPredio(f) {
+    if (predSel) { map.removeLayer(predSel); predSel = null; }
+    if (f) predSel = L.geoJSON(f, { interactive: false, style: { color: '#111', weight: 3, opacity: 1, fill: true, fillOpacity: 0.08, fillColor: '#111' } }).addTo(map);
+  }
+
   /* ---------- Estilos ---------- */
   function fillUso(p) {
     if (state.ciiu) return C[CATS.find(c => c.k === verdictOf(resolver(state.ciiu, fichaDeUso(p)))).tok];
@@ -281,8 +309,18 @@ details.more p { font-size: 13px; color: var(--fg); margin: 8px 0 0; }
     const ll = state.pt; if (!ll) return renderHome();
     const u = hit(USOS, ll), t = hit(TRAT, ll), a = hit(ACT, ll), b = hit(BAR, ll);
     const card = document.getElementById('card');
+    const pr = state.predio;
+    let predHTML = '';
+    if (pr) {
+      const q = pr.properties, zs = zonasDelPredio(pr);
+      predHTML = `<div class="ficha-tag" style="display:block"><p class="eyebrow" style="margin:0 0 4px">Predio</p>
+        <dl class="kv"><dt>Número predial</dt><dd style="font-variant-numeric:tabular-nums">${esc(q.c) || '—'}</dd>
+        <dt>Número anterior</dt><dd style="font-variant-numeric:tabular-nums">${esc(q.a) || '—'}</dd>
+        <dt>Área del terreno</dt><dd>${NF.format(q.m2)} m²</dd></dl>
+        ${zs.length > 1 ? `<p class="note" style="margin-top:6px">Este predio abarca más de una zona de uso: ${zs.map(z => esc(NOM_USO[z] || z)).join(', ')}. La norma de abajo corresponde al punto marcado.</p>` : ''}</div>`;
+    }
     if (!u) {
-      card.innerHTML = `<div><p class="eyebrow" style="margin:0 0 4px">Punto seleccionado</p><h2>Fuera de las zonas de uso</h2></div><p class="sub">Este punto no cae dentro de un polígono del mapa CU-13 (puede ser vía, fuera del perímetro urbano o un vacío del mapa).${t ? ' Tratamiento: ' + esc(NOM_TRAT[t.properties.det] || t.properties.det) + '.' : ''}</p><button class="linkbtn" type="button" id="clear">Volver</button>`;
+      card.innerHTML = `<div><p class="eyebrow" style="margin:0 0 4px">Punto seleccionado</p><h2>Fuera de las zonas de uso</h2></div>${predHTML}<p class="sub">Este punto no cae dentro de un polígono del mapa CU-13 (puede ser vía, fuera del perímetro urbano o un vacío del mapa).${t ? ' Tratamiento: ' + esc(NOM_TRAT[t.properties.det] || t.properties.det) + '.' : ''}</p><button class="linkbtn" type="button" id="clear">Volver</button>`;
       document.getElementById('clear').onclick = clearPoint; return;
     }
     const p = u.properties;
@@ -318,6 +356,7 @@ details.more p { font-size: 13px; color: var(--fg); margin: 8px 0 0; }
         <dt>Área de actividad (CU-12)</dt><dd>${esc(tipo)}</dd>
         <dt>Tratamiento (CU-11)</dt><dd>${esc(NOM_TRAT[tdet] || tdet || '—')}</dd>
       </dl>
+      ${predHTML}
       <div class="ficha-tag"><b>${fid}</b><span><strong>${esc(f.titulo)}</strong><br><span class="sub">${N.relacion.categoria[p.cat] ? 'Ficha del sector' : 'Ficha del tratamiento urbanístico'} · uso principal: ${esc(NOM_USO_GRAL[f.uso.cod] || f.uso.nom)}</span></span></div>
       ${nonCiiu('complementario') ? `<p class="note">Además admite como complementario: ${f.complementario.filter(x => NOM_USO_GRAL[x]).map(x => NOM_USO_GRAL[x]).join(', ')}.</p>` : ''}
       ${(() => { const miss = ['principal', 'complementario', 'prohibido'].flatMap(l => f[l]).filter(x => /^\d{4}$/.test(x) && !DESC[x]); return miss.length ? `<p class="note">La ficha ${fid} menciona ${miss.length > 1 ? 'los códigos' : 'el código'} ${miss.join(', ')}, que no ${miss.length > 1 ? 'están' : 'está'} en la tabla CIIU del PBOT.</p>` : ''; })()}
@@ -332,7 +371,14 @@ details.more p { font-size: 13px; color: var(--fg); margin: 8px 0 0; }
       ${f.tratamiento ? `<details class="more"><summary>Tratamiento urbanístico</summary><p>${esc(f.tratamiento)}</p></details>` : ''}`;
     document.getElementById('clear').onclick = clearPoint;
   }
-  function clearPoint() { state.pt = null; if (marker) { map.removeLayer(marker); marker = null; } renderHome(); }
+  function clearPoint() { state.pt = null; state.predio = null; marcarPredio(null); if (marker) { map.removeLayer(marker); marker = null; } renderHome(); }
+  function consultar(ll, predio) {
+    state.pt = ll; state.predio = predio === undefined ? predioEn(ll) : predio;
+    marcarPredio(state.predio);
+    if (marker) marker.setLatLng(ll); else marker = L.circleMarker(ll, { radius: 7, color: '#fff', weight: 2.5, fillColor: '#1d2420', fillOpacity: 1, interactive: false }).addTo(map);
+    renderPoint();
+    if (window.innerWidth <= 900) document.getElementById('card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
 
   function renderCiiuSel() {
     const el = document.getElementById('ciiu-sel');
@@ -416,12 +462,7 @@ details.more p { font-size: 13px; color: var(--fg); margin: 8px 0 0; }
       legend = L.control({ position: 'bottomleft' });
       legend.onAdd = () => { const d = L.DomUtil.create('div', 'legend'); L.DomEvent.disableClickPropagation(d); return d; };
       legend.addTo(map);
-      map.on('click', e => {
-        state.pt = e.latlng;
-        if (marker) marker.setLatLng(e.latlng); else marker = L.circleMarker(e.latlng, { radius: 7, color: '#fff', weight: 2.5, fillColor: '#1d2420', fillOpacity: 1, interactive: false }).addTo(map);
-        renderPoint();
-        if (window.innerWidth <= 900) document.getElementById('card').scrollIntoView({ behavior: 'smooth', block: 'start' });
-      });
+      map.on('click', e => consultar(e.latlng));
       makeSearch(document.getElementById('q'), document.getElementById('res'), t => {
         const out = [];
         Object.keys(DESC).forEach(c => { const k = norm(c + ' ' + DESC[c]); if (k.includes(t)) out.push({ code: c, score: c.startsWith(t) ? 0 : 1 }); });
@@ -432,6 +473,29 @@ details.more p { font-size: 13px; color: var(--fg); margin: 8px 0 0; }
         h => { userMoved = true; const l = L.geoJSON(h.f); map.flyToBounds(l.getBounds(), { padding: [40, 40], maxZoom: 17, duration: .6 }); });
       document.getElementById('loading').hidden = true;
       restyle(); renderHome();
+
+      // Predios: se cargan después, para que el mapa aparezca rápido
+      const est = document.getElementById('predios-estado'), qp = document.getElementById('qp');
+      fetch('predios.json').then(r => { if (!r.ok) throw new Error('predios'); return r.json(); }).then(P => {
+        PRED = P; PBOX = P.features.map(bboxOf);
+        predL = L.geoJSON(P, { renderer, interactive: false, style: { color: '#26302b', weight: 0.6, opacity: 0.55, fill: false } });
+        const ver = () => { const z = map.getZoom(); if (z >= 16 && !map.hasLayer(predL)) { predL.addTo(map); limL.bringToFront(); } else if (z < 16 && map.hasLayer(predL)) map.removeLayer(predL); };
+        map.on('zoomend', ver); ver();
+        qp.disabled = false;
+        est.textContent = 'Los linderos de los predios se ven al acercar el mapa.';
+        if (state.pt && !state.predio) { state.predio = predioEn(state.pt); marcarPredio(state.predio); renderPoint(); }
+        makeSearch(qp, document.getElementById('resp'), t => {
+          const d = t.replace(/\D/g, ''); if (d.length < 4) return [];
+          const out = [];
+          for (const f of P.features) { const q = f.properties; const i = q.c.indexOf(d), j = q.a.indexOf(d); if (i >= 0 || j >= 0) { out.push({ f, s: Math.min(i < 0 ? 99 : i, j < 0 ? 99 : j) }); if (out.length > 400) break; } }
+          return out.sort((a, b) => a.s - b.s).map(({ f }) => ({ f, label: f.properties.c, html: `<span class="c" style="grid-column:1/3;font-size:12.5px">${esc(f.properties.c)}<br><small>Anterior: ${esc(f.properties.a) || '—'}</small></span><small>${NF.format(f.properties.m2)} m²</small>` }));
+        }, h => {
+          userMoved = true;
+          const ll = L.latLng(h.f.properties.p[1], h.f.properties.p[0]);
+          map.flyToBounds(L.geoJSON(h.f).getBounds(), { padding: [80, 80], maxZoom: 18, duration: .6 });
+          consultar(ll, h.f);
+        });
+      }).catch(() => { est.textContent = 'No se pudieron cargar los predios. Recargue la página.'; });
     })
     .catch(err => { document.getElementById('loading').textContent = 'No se pudieron cargar las capas. Recargue la página.'; console.error(err); });
 })();
