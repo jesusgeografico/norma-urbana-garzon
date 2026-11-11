@@ -112,6 +112,54 @@ details.more p { font-size: 13px; color: var(--fg); margin: 8px 0 0; }
 .leaflet-tooltip-top:before, .leaflet-tooltip-bottom:before, .leaflet-tooltip-left:before, .leaflet-tooltip-right:before { display: none; }
 .leaflet-tooltip b { font-family: var(--font-display); font-size: 14px; }
 
+/* Botón de impresión y diálogo */
+.btn { border: 0; border-radius: 8px; padding: 9px 14px; cursor: pointer; font-weight: 600; background: var(--accent); color: var(--panel); display: inline-flex; gap: 8px; align-items: center; justify-content: center; }
+.btn.sec { background: var(--bg); color: var(--fg); border: 1px solid var(--line); }
+.dlg { position: fixed; inset: 0; z-index: 3000; background: rgba(10,16,13,.45); display: grid; place-items: center; padding: 16px; }
+.dlg-box { background: var(--panel); color: var(--fg); border-radius: 12px; width: min(460px, 100%); padding: 20px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 20px 50px rgba(0,0,0,.3); }
+.dlg-box h2 { font-family: var(--font-display); font-size: 22px; margin: 0; }
+.dlg-box label { display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; color: var(--muted); }
+.dlg-box input, .dlg-box textarea { border: 1px solid var(--line); background: var(--bg); border-radius: 8px; padding: 8px 10px; font: inherit; color: var(--fg); }
+.dlg-box textarea { min-height: 64px; resize: vertical; }
+.dlg-actions { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+
+/* Hoja de impresión (colores fijos: siempre se imprime en papel blanco) */
+#printdoc { display: none; }
+@media print {
+  @page { size: letter portrait; margin: 13mm 14mm; }
+  html, body { height: auto; background: #fff !important; color: #111 !important; }
+  .app, .dlg { display: none !important; }
+  #printdoc { display: block; font-family: var(--font-body); font-size: 10pt; line-height: 1.35; color: #111; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+.pd-head { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 12px; border-bottom: 2px solid #111; padding-bottom: 6px; margin-bottom: 8px; }
+.pd-head h1 { font-family: var(--font-display); font-size: 17pt; margin: 0; line-height: 1.05; }
+.pd-head p { margin: 2px 0 0; font-size: 9pt; color: #444; }
+.pd-head .meta { text-align: right; font-size: 8.5pt; color: #333; }
+.pd-grid { display: grid; grid-template-columns: 1.15fr 1fr; gap: 12px; align-items: start; }
+.pd-sec { margin: 0 0 9px; break-inside: avoid; }
+.pd-sec h2 { font-family: var(--font-display); font-size: 11pt; text-transform: uppercase; letter-spacing: .06em; margin: 0 0 4px; border-bottom: 1px solid #999; padding-bottom: 2px; }
+.pd-kv { display: grid; grid-template-columns: auto minmax(0,1fr); gap: 2px 10px; margin: 0; font-size: 9.5pt; }
+.pd-kv dt { color: #555; }
+.pd-kv dd { margin: 0; font-variant-numeric: tabular-nums; }
+.pd-map { border: 1px solid #777; width: 100%; height: auto; display: block; }
+.pd-leg { display: flex; flex-wrap: wrap; gap: 3px 10px; font-size: 7.5pt; margin-top: 3px; color: #333; }
+.pd-leg span { display: inline-flex; gap: 4px; align-items: center; }
+.pd-leg i { width: 10px; height: 8px; display: inline-block; border: 1px solid #666; }
+.pd-verdict { border: 2px solid #111; padding: 5px 8px; margin: 0 0 9px; }
+.pd-verdict b { font-family: var(--font-display); font-size: 12pt; }
+.pd-uses { width: 100%; border-collapse: collapse; font-size: 8.5pt; }
+.pd-uses th, .pd-uses td { border: 1px solid #aaa; padding: 3px 5px; text-align: left; vertical-align: top; }
+.pd-uses th { background: #eee; width: 22%; font-weight: 600; }
+.pd-codes { columns: 2; column-gap: 14px; font-size: 7.6pt; margin: 3px 0 0; }
+.pd-codes div { break-inside: avoid; }
+.pd-params { width: 100%; border-collapse: collapse; font-size: 8.5pt; }
+.pd-params td { border-bottom: 1px solid #ccc; padding: 2px 4px 2px 0; vertical-align: top; }
+.pd-params td:first-child { color: #555; width: 45%; }
+.pd-foot { margin-top: 10px; border-top: 1px solid #999; padding-top: 5px; font-size: 7.8pt; color: #444; }
+.pd-firma { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-top: 26px; font-size: 8.5pt; }
+.pd-firma div { border-top: 1px solid #111; padding-top: 3px; }
+
 @media (max-width: 900px) {
   html, body { height: auto; }
   .app { display: flex; flex-direction: column; height: auto; }
@@ -167,6 +215,21 @@ details.more p { font-size: 13px; color: var(--fg); margin: 8px 0 0; }
     <div class="loading" id="loading">Cargando la norma urbana…</div>
   </main>
 </div>
+
+<div class="dlg" id="dlg" hidden role="dialog" aria-modal="true" aria-labelledby="dlg-t">
+  <form class="dlg-box" id="dlg-form">
+    <h2 id="dlg-t">Imprimir ficha del predio</h2>
+    <p class="sub" style="margin:0">Estos datos son opcionales y solo aparecen en la hoja impresa.</p>
+    <label for="pd-sol">Solicitante<input id="pd-sol" type="text" autocomplete="name"></label>
+    <label for="pd-rad">Radicado o número de solicitud<input id="pd-rad" type="text"></label>
+    <label for="pd-obs">Observaciones<textarea id="pd-obs"></textarea></label>
+    <div class="dlg-actions">
+      <button class="btn sec" type="button" id="dlg-x">Cancelar</button>
+      <button class="btn" type="submit">Imprimir o guardar PDF</button>
+    </div>
+  </form>
+</div>
+<div id="printdoc"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
@@ -241,6 +304,86 @@ details.more p { font-size: 13px; color: var(--fg); margin: 8px 0 0; }
     f.geometry.coordinates.forEach(poly => poly[0].forEach(([x, y]) => probe(x + (px - x) * 0.2, y + (py - y) * 0.2)));
     return [...cats];
   }
+  /* ---------- Impresión ---------- */
+  let UBOX = [], LBOX = [];
+  const inter = (a, b) => a[0] <= b[2] && a[2] >= b[0] && a[1] <= b[3] && a[3] >= b[1];
+  function planoSVG(pred, pt) {
+    const bb = bboxOf(pred), cx = (bb[0] + bb[2]) / 2, cy = (bb[1] + bb[3]) / 2;
+    const kx = Math.cos(cy * Math.PI / 180) * 111320, ky = 110540, W = 700, H = 460;
+    const wm = Math.max((bb[2] - bb[0]) * kx, 40), hm = Math.max((bb[3] - bb[1]) * ky, 40);
+    let s = Math.min(W / (wm * 3.2), H / (hm * 3.2)); s = Math.min(s, 6);
+    const P = (x, y) => [(W / 2 + (x - cx) * kx * s).toFixed(1), (H / 2 - (y - cy) * ky * s).toFixed(1)];
+    const half = [W / 2 / (kx * s), H / 2 / (ky * s)], view = [cx - half[0], cy - half[1], cx + half[0], cy + half[1]];
+    const path = f => f.geometry.coordinates.map(poly => poly.map(r => 'M' + r.map(c => P(c[0], c[1]).join(' ')).join('L') + 'Z').join('')).join('');
+    const seen = new Set(); let out = '';
+    USOS.features.forEach((f, i) => { if (inter(UBOX[i], view)) { out += `<path d="${path(f)}" fill="${COL_USO[f.properties.cat] || '#ddd'}" fill-opacity=".55" stroke="#fff" stroke-width=".8" fill-rule="evenodd"/>`; seen.add(f.properties.cat); } });
+    PRED.features.forEach((f, i) => { if (inter(PBOX[i], view)) out += `<path d="${path(f)}" fill="none" stroke="#333" stroke-width=".55" stroke-opacity=".8"/>`; });
+    LIM.features.forEach((f, i) => { if (inter(LBOX[i], view)) out += `<path d="${path(f)}" fill="none" stroke="#111" stroke-width="2" stroke-dasharray="${f.properties.tipo.startsWith('Per') ? '' : '7 4'}"/>`; });
+    out += `<path d="${path(pred)}" fill="#000" fill-opacity=".14" stroke="#000" stroke-width="2.6" fill-rule="evenodd"/>`;
+    if (pt) { const [x, y] = P(pt.lng, pt.lat); out += `<circle cx="${x}" cy="${y}" r="4.5" fill="#000" stroke="#fff" stroke-width="1.5"/>`; }
+    // escala
+    const nice = [5, 10, 20, 25, 50, 100, 200, 250, 500], target = W * 0.22 / s, len = nice.reduce((a, b) => Math.abs(b - target) < Math.abs(a - target) ? b : a), px = len * s;
+    out += `<g font-family="Public Sans, Arial, sans-serif" font-size="11" fill="#111"><rect x="14" y="${H - 34}" width="${px + 20}" height="26" fill="#fff" fill-opacity=".85"/><rect x="24" y="${H - 18}" width="${px / 2}" height="5" fill="#111"/><rect x="${24 + px / 2}" y="${H - 18}" width="${px / 2}" height="5" fill="#fff" stroke="#111" stroke-width="1"/><text x="24" y="${H - 22}">0</text><text x="${24 + px}" y="${H - 22}" text-anchor="end">${len} m</text></g>`;
+    // norte
+    out += `<g transform="translate(${W - 34} 18)"><rect x="-14" y="-6" width="28" height="44" fill="#fff" fill-opacity=".85"/><path d="M0 0 L9 26 L0 20 L-9 26 Z" fill="#111"/><text x="0" y="36" text-anchor="middle" font-family="Barlow Semi Condensed, Arial, sans-serif" font-weight="700" font-size="12">N</text></g>`;
+    const leg = [...seen].map(c => `<span><i style="background:${COL_USO[c]};opacity:.75"></i>${esc(NOM_USO[c] || c)}</span>`).join('') + '<span><i style="background:rgba(0,0,0,.14);border:2px solid #000"></i>Predio consultado</span>';
+    return `<svg class="pd-map" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Plano de localización del predio"><rect width="${W}" height="${H}" fill="#fafaf7"/>${out}</svg><div class="pd-leg">${leg}</div>`;
+  }
+
+  function hojaImpresion(ctx, sol, rad, obs) {
+    const { u, t, a, b, f, fid, B, pr, ll } = ctx, p = u.properties, q = pr.properties;
+    const now = new Date(), fecha = now.toLocaleDateString('es-CO', { day: '2-digit', month: 'long', year: 'numeric' }) + ' · ' + now.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
+    const tdet = t ? t.properties.det : p.trat, zs = zonasDelPredio(pr);
+    const tokens = k => (k === 'principal' && !f.principal.length ? [f.uso.cod] : f[k]).map(x => /^\d{4}$/.test(x) ? x : (NOM_USO_GRAL[x] || x + ' (' + (N.grupos[x] || '') + ')')).join(', ') || 'Ninguno';
+    const codes = (k, full) => B[k].length ? (full ? `<div class="pd-codes">${B[k].map(x => `<div><b>${x.code}</b> ${esc(DESC[x.code])}${x.mixed ? ' <i>(como ' + esc(x.via) + ')</i>' : ''}</div>`).join('')}</div>` : `<div class="pd-codes" style="columns:1">${B[k].map(x => x.code).join(', ')}</div>`) : '';
+    let verdict = '';
+    if (state.ciiu) {
+      const r = resolver(state.ciiu, f), v = CATS.find(c => c.k === verdictOf(r));
+      verdict = `<div class="pd-verdict"><b>Actividad consultada: ${state.ciiu} · ${v.t.toUpperCase()}</b><br>${esc(DESC[state.ciiu])}${r.length > 1 ? '<br>' + r.map(x => CATS.find(c => c.k === x.cat).t + ' como ' + esc(x.via)).join(' · ') : ''}</div>`;
+    }
+    const mixed = Object.values(B).flat().some(x => x.mixed);
+    return `
+      <div class="pd-head"><div><h1>Ficha normativa del predio</h1><p>Municipio de Garzón (Huila) · Plan Básico de Ordenamiento Territorial 2026–2039 · Suelo urbano</p><p><b>Consulta informativa</b></p></div>
+        <div class="meta">Fecha de consulta:<br><b>${esc(fecha)}</b>${rad ? '<br>Radicado: <b>' + esc(rad) + '</b>' : ''}${sol ? '<br>Solicitante: <b>' + esc(sol) + '</b>' : ''}</div></div>
+      <div class="pd-grid">
+        <div class="pd-sec"><h2>Localización</h2>${planoSVG(pr, ll)}</div>
+        <div>
+          <div class="pd-sec"><h2>Datos del predio</h2><dl class="pd-kv">
+            <dt>Número predial</dt><dd>${esc(q.c) || '—'}</dd><dt>Número anterior</dt><dd>${esc(q.a) || '—'}</dd>
+            <dt>Área del terreno</dt><dd>${NF.format(q.m2)} m²</dd><dt>Barrio</dt><dd>${b && b.properties.bar ? esc(b.properties.bar) : '—'}</dd>
+            <dt>Punto consultado</dt><dd>${ll.lat.toFixed(6)}, ${ll.lng.toFixed(6)}</dd></dl></div>
+          <div class="pd-sec"><h2>Norma aplicable</h2><dl class="pd-kv">
+            <dt>Uso del suelo (CU-13)</dt><dd>${esc(NOM_USO[p.cat] || p.cat)}</dd>
+            <dt>Área de actividad (CU-12)</dt><dd>${a && a.properties.aa ? esc(a.properties.aa.toLowerCase().replace(/^./, m => m.toUpperCase())) : '—'}</dd>
+            <dt>Tratamiento (CU-11)</dt><dd>${esc(NOM_TRAT[tdet] || tdet || '—')}</dd>
+            <dt>Ficha normativa</dt><dd><b>${fid}</b> · ${esc(f.titulo)}</dd>
+            <dt>Uso principal</dt><dd>${esc(NOM_USO_GRAL[f.uso.cod] || f.uso.nom)}</dd></dl>
+            ${zs.length > 1 ? `<p style="font-size:8.5pt;margin:4px 0 0"><b>Nota:</b> el predio abarca más de una zona de uso (${zs.map(z => esc(NOM_USO[z] || z)).join(', ')}). La norma indicada corresponde al punto consultado.</p>` : ''}</div>
+          ${verdict}
+        </div>
+      </div>
+      <div class="pd-sec"><h2>Usos del suelo según la ficha ${fid}</h2>
+        <table class="pd-uses"><tbody>
+          <tr><th>Principales</th><td>${esc(tokens('principal'))}${codes('principal', true)}</td></tr>
+          <tr><th>Complementarios</th><td>${esc(tokens('complementario'))}${codes('complementario', true)}</td></tr>
+          <tr><th>Condicionados</th><td>Todos los usos no mencionados en la ficha (${B.condicionado.length} códigos CIIU). Requieren concepto de Planeación.</td></tr>
+          <tr><th>Prohibidos</th><td>${esc(tokens('prohibido'))} · ${B.prohibido.length} códigos CIIU:${codes('prohibido', false)}</td></tr>
+        </tbody></table>
+        ${mixed ? '<p style="font-size:8pt;margin:4px 0 0">Los códigos marcados «como …» pertenecen a más de un grupo en la tabla CIIU del PBOT; su tratamiento depende del grupo o la escala del establecimiento.</p>' : ''}
+      </div>
+      ${f.parametros.length ? `<div class="pd-sec"><h2>Norma urbanística · ficha ${fid}</h2><table class="pd-params"><tbody>${f.parametros.map(r => `<tr><td>${esc(r[0])}</td><td>${esc(r[1])}</td></tr>`).join('')}</tbody></table></div>` : ''}
+      ${obs ? `<div class="pd-sec"><h2>Observaciones</h2><p style="margin:0;white-space:pre-wrap">${esc(obs)}</p></div>` : ''}
+      <div class="pd-firma"><div>Funcionario que atiende</div><div>Solicitante</div></div>
+      <div class="pd-foot">Documento de consulta generado a partir de la cartografía del PBOT de Garzón 2026–2039 (mapas CU-11, CU-12 y CU-13), las fichas normativas y la tabla de códigos CIIU del PBOT. Tiene carácter informativo y no reemplaza el concepto de uso del suelo ni las licencias que expide la autoridad municipal competente. Los usos condicionados requieren concepto previo de la Secretaría de Planeación.<br>Consulta en línea: jesusgeografico.github.io/norma-urbana-garzon</div>`;
+  }
+
+  function abrirImpresion() {
+    if (!state.ctx || !state.ctx.pr) return;
+    const d = document.getElementById('dlg'); d.hidden = false;
+    setTimeout(() => document.getElementById('pd-sol').focus(), 30);
+  }
+  function cerrarDlg() { document.getElementById('dlg').hidden = true; }
+
   function marcarPredio(f) {
     if (predSel) { map.removeLayer(predSel); predSel = null; }
     if (f) predSel = L.geoJSON(f, { interactive: false, style: { color: '#111', weight: 3, opacity: 1, fill: true, fillOpacity: 0.08, fillColor: '#111' } }).addTo(map);
@@ -339,10 +482,10 @@ details.more p { font-size: 13px; color: var(--fg); margin: 8px 0 0; }
     const bucket = (k, title, open) => {
       const cat = CATS.find(c => c.k === k), list = B[k];
       const chips = k === 'condicionado' ? `<span class="chip">${esc((f.condicionado || 'Todos los demás').toLowerCase().replace(/^./, m => m.toUpperCase()))}</span>` :
-        f[k].map(x => `<span class="chip" title="${esc(tokenLabel(x))}">${esc(/^\d{4}$/.test(x) ? x : (NOM_USO_GRAL[x] ? NOM_USO_GRAL[x] : x + ' · ' + (N.grupos[x] || '')))}</span>`).join('');
+        (k === 'principal' && !f.principal.length ? [f.uso.cod] : f[k]).map(x => `<span class="chip" title="${esc(tokenLabel(x))}">${esc(/^\d{4}$/.test(x) ? x : (NOM_USO_GRAL[x] ? NOM_USO_GRAL[x] : x + ' · ' + (N.grupos[x] || '')))}</span>`).join('');
       return `<details class="bucket"${open ? ' open' : ''}><summary><span class="dot" style="background:${C[cat.tok]}"></span><span class="t">${title}</span><span class="n">${list.length} códigos</span></summary>
         <div class="chips">${chips || '<span class="chip">Ninguno</span>'}</div>
-        <div class="codes">${list.map(x => `<div><span class="c">${x.code}</span><span>${esc(DESC[x.code])}${x.mixed ? ` <small>· como ${esc(x.via)}</small>` : ''}</span></div>`).join('') || '<div><span></span><small>Sin códigos CIIU en esta categoría</small></div>'}</div></details>`;
+        <div class="codes">${list.map(x => `<div><span class="c">${x.code}</span><span>${esc(DESC[x.code])}${x.mixed ? ` <small>· como ${esc(x.via)}</small>` : ''}</span></div>`).join('') || `<div><span></span><small>${k === 'principal' && !f.principal.length ? 'El uso principal es ' + esc((NOM_USO_GRAL[f.uso.cod] || f.uso.nom).toLowerCase()) + '; no tiene códigos CIIU asociados' : 'Sin códigos CIIU en esta categoría'}</small></div>`}</div></details>`;
     };
     const tipo = a && a.properties.aa ? a.properties.aa.toLowerCase().replace(/^./, m => m.toUpperCase()) : '—';
     card.innerHTML = `
@@ -357,6 +500,7 @@ details.more p { font-size: 13px; color: var(--fg); margin: 8px 0 0; }
         <dt>Tratamiento (CU-11)</dt><dd>${esc(NOM_TRAT[tdet] || tdet || '—')}</dd>
       </dl>
       ${predHTML}
+      ${pr ? '<button class="btn" type="button" id="btn-print">Imprimir ficha del predio</button>' : '<p class="note">Para imprimir una ficha, seleccione un predio: acerque el mapa y haga clic dentro de un lote, o búsquelo por su número predial.</p>'}
       <div class="ficha-tag"><b>${fid}</b><span><strong>${esc(f.titulo)}</strong><br><span class="sub">${N.relacion.categoria[p.cat] ? 'Ficha del sector' : 'Ficha del tratamiento urbanístico'} · uso principal: ${esc(NOM_USO_GRAL[f.uso.cod] || f.uso.nom)}</span></span></div>
       ${nonCiiu('complementario') ? `<p class="note">Además admite como complementario: ${f.complementario.filter(x => NOM_USO_GRAL[x]).map(x => NOM_USO_GRAL[x]).join(', ')}.</p>` : ''}
       ${(() => { const miss = ['principal', 'complementario', 'prohibido'].flatMap(l => f[l]).filter(x => /^\d{4}$/.test(x) && !DESC[x]); return miss.length ? `<p class="note">La ficha ${fid} menciona ${miss.length > 1 ? 'los códigos' : 'el código'} ${miss.join(', ')}, que no ${miss.length > 1 ? 'están' : 'está'} en la tabla CIIU del PBOT.</p>` : ''; })()}
@@ -370,8 +514,21 @@ details.more p { font-size: 13px; color: var(--fg); margin: 8px 0 0; }
       ${f.descripcion ? `<details class="more"><summary>Descripción de la ficha</summary><p>${esc(f.descripcion)}</p></details>` : ''}
       ${f.tratamiento ? `<details class="more"><summary>Tratamiento urbanístico</summary><p>${esc(f.tratamiento)}</p></details>` : ''}`;
     document.getElementById('clear').onclick = clearPoint;
+    state.ctx = { u, t, a, b, f, fid, B, pr, ll };
+    const bp = document.getElementById('btn-print'); if (bp) bp.onclick = abrirImpresion;
   }
-  function clearPoint() { state.pt = null; state.predio = null; marcarPredio(null); if (marker) { map.removeLayer(marker); marker = null; } renderHome(); }
+  document.getElementById('dlg-x').onclick = cerrarDlg;
+  document.getElementById('dlg').addEventListener('click', e => { if (e.target.id === 'dlg') cerrarDlg(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !document.getElementById('dlg').hidden) cerrarDlg(); });
+  document.getElementById('dlg-form').addEventListener('submit', e => {
+    e.preventDefault();
+    const v = id => document.getElementById(id).value.trim();
+    document.getElementById('printdoc').innerHTML = hojaImpresion(state.ctx, v('pd-sol'), v('pd-rad'), v('pd-obs'));
+    cerrarDlg();
+    setTimeout(() => window.print(), 80);
+  });
+
+  function clearPoint() { state.pt = null; state.predio = null; state.ctx = null; marcarPredio(null); if (marker) { map.removeLayer(marker); marker = null; } renderHome(); }
   function consultar(ll, predio) {
     state.pt = ll; state.predio = predio === undefined ? predioEn(ll) : predio;
     marcarPredio(state.predio);
@@ -442,6 +599,7 @@ details.more p { font-size: 13px; color: var(--fg); margin: 8px 0 0; }
   Promise.all(['norma.json', 'usos.json', 'tratamientos.json', 'actividad.json', 'barrios.json', 'limites.json'].map(u => fetch(u).then(r => { if (!r.ok) throw new Error(u); return r.json(); })))
     .then(([n, u, t, a, b, l]) => {
       N = n; USOS = u; TRAT = t; ACT = a; BAR = b; LIM = l;
+      UBOX = USOS.features.map(bboxOf); LBOX = LIM.features.map(bboxOf);
       N.ciiu.forEach(([c, d, g]) => { (GR[c] = GR[c] || []).includes(g) || GR[c].push(g); DESC[c] = DESC[c] || d; });
       const renderer = L.canvas({ padding: 0.4, tolerance: 3 });
       tratL = L.geoJSON(TRAT, { renderer, style: styleTrat, onEachFeature: (f, l) => l.bindTooltip(() => `<b>${esc(NOM_TRAT[f.properties.det] || f.properties.det)}</b><br>${NF.format(f.properties.ha)} ha`, { sticky: true, direction: 'top', offset: [0, -8] }) }).addTo(map);
