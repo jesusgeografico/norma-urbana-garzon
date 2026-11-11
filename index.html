@@ -1,0 +1,427 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Norma Urbana Garzón</title>
+<meta name="description" content="Consulta de usos del suelo, tratamientos urbanísticos y códigos CIIU permitidos en el suelo urbano de Garzón (PBOT 2026–2039).">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=Public+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: panel de consulta a la izquierda + mapa; en teléfono, mapa arriba y panel debajo */
+:root {
+  --bg: #f6f7f4; --panel: #fdfdfb; --fg: #1d2420; --muted: #5e6a63; --line: #d9ded8;
+  --accent: #2f5d50; --accent-soft: #e3eee9;
+  --ok: #2e9e5b; --comp: #3b7fc4; --cond: #d99a1e; --no: #c8414f; --mix: #8b5cc2;
+  --font-display: "Barlow Semi Condensed", "Arial Narrow", sans-serif;
+  --font-body: "Public Sans", "Segoe UI", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --bg:#121815; --panel:#171f1b; --fg:#e4ebe6; --muted:#97a69d; --line:#2b3732; --accent:#8fd0b5; --accent-soft:#1f3a31; --ok:#4cc27e; --comp:#6aa7e6; --cond:#ebb54a; --no:#ec6b78; --mix:#b18ae6; color-scheme: dark; }
+}
+:root[data-theme="dark"] { --bg:#121815; --panel:#171f1b; --fg:#e4ebe6; --muted:#97a69d; --line:#2b3732; --accent:#8fd0b5; --accent-soft:#1f3a31; --ok:#4cc27e; --comp:#6aa7e6; --cond:#ebb54a; --no:#ec6b78; --mix:#b18ae6; color-scheme: dark; }
+
+html, body { height: 100%; }
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 14px; line-height: 1.45; }
+[hidden] { display: none !important; }
+* { box-sizing: border-box; }
+button, input { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.app { display: grid; grid-template-columns: 420px minmax(0,1fr); height: 100%; }
+.panel { background: var(--panel); border-right: 1px solid var(--line); overflow-y: auto; min-width: 0; }
+.inner { display: flex; flex-direction: column; gap: 18px; padding-block: 20px 28px; padding-left: max(18px, env(safe-area-inset-left, 0px)); padding-right: 18px; }
+.mapwrap { position: relative; min-width: 0; }
+#map { position: absolute; inset: 0; background: #e8ebe6; }
+
+header h1 { font-family: var(--font-display); font-weight: 700; font-size: 27px; line-height: 1.05; margin: 0; text-wrap: balance; }
+header p { margin: 5px 0 0; color: var(--muted); font-size: 12.5px; }
+.eyebrow { font-family: var(--font-display); font-weight: 600; font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin: 0 0 7px; }
+
+.seg { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--line); border-radius: 8px; padding: 3px; gap: 3px; background: var(--bg); }
+.seg button { border: 0; background: transparent; padding: 7px 8px; border-radius: 6px; cursor: pointer; font-weight: 500; color: var(--muted); }
+.seg button[aria-pressed="true"] { background: var(--panel); color: var(--fg); box-shadow: 0 1px 2px rgba(0,0,0,.12); }
+
+.search { position: relative; }
+.search input { width: 100%; border: 1px solid var(--line); background: var(--bg); border-radius: 8px; padding: 9px 12px; }
+.results { position: absolute; z-index: 1200; left: 0; right: 0; top: calc(100% + 4px); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,.16); max-height: 320px; overflow-y: auto; padding: 4px; }
+.results button { display: grid; grid-template-columns: 46px minmax(0,1fr) auto; gap: 8px; width: 100%; border: 0; background: transparent; text-align: left; padding: 7px 8px; border-radius: 6px; cursor: pointer; align-items: baseline; }
+.results button:hover, .results button.on { background: var(--accent-soft); }
+.results .c { font-variant-numeric: tabular-nums; font-weight: 600; }
+.results small { color: var(--muted); white-space: nowrap; }
+.sel-ciiu { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 10px; align-items: start; background: var(--accent-soft); border-radius: 8px; padding: 10px 12px; margin-top: 8px; }
+.sel-ciiu b { font-family: var(--font-display); font-size: 17px; }
+.sel-ciiu span { font-size: 12.5px; }
+.linkbtn { border: 1px solid var(--line); background: var(--panel); border-radius: 6px; padding: 4px 9px; font-size: 12px; cursor: pointer; white-space: nowrap; color: var(--accent); font-weight: 500; }
+
+.card { border-top: 1px solid var(--line); padding-top: 16px; display: flex; flex-direction: column; gap: 12px; }
+.card h2 { font-family: var(--font-display); font-weight: 700; font-size: 23px; line-height: 1.08; margin: 0; text-wrap: balance; }
+.sub { color: var(--muted); font-size: 12.5px; }
+.kv { display: grid; grid-template-columns: auto minmax(0,1fr); gap: 5px 12px; font-size: 13px; margin: 0; }
+.kv dt { color: var(--muted); }
+.kv dd { margin: 0; overflow-wrap: anywhere; }
+.ficha-tag { display: inline-flex; align-items: center; gap: 8px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+.ficha-tag b { font-family: var(--font-display); font-size: 20px; color: var(--accent); }
+.verdict { border-radius: 8px; padding: 10px 12px; color: #fff; display: flex; flex-direction: column; gap: 2px; }
+.verdict b { font-family: var(--font-display); font-size: 19px; letter-spacing: .02em; }
+.verdict span { font-size: 12.5px; opacity: .95; }
+.bucket { border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.bucket > summary { list-style: none; cursor: pointer; display: grid; grid-template-columns: 10px minmax(0,1fr) auto; gap: 10px; align-items: center; padding: 9px 11px; }
+.bucket > summary::-webkit-details-marker { display: none; }
+.bucket > summary .dot { width: 10px; height: 10px; border-radius: 50%; }
+.bucket > summary .t { font-weight: 600; }
+.bucket > summary .n { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.chips { display: flex; flex-wrap: wrap; gap: 5px; padding: 0 11px 10px 31px; }
+.chip { font-size: 11.5px; border-radius: 999px; padding: 2px 8px; background: var(--bg); border: 1px solid var(--line); }
+.codes { max-height: 260px; overflow-y: auto; border-top: 1px solid var(--line); }
+.codes div { display: grid; grid-template-columns: 42px minmax(0,1fr); gap: 8px; padding: 5px 11px; font-size: 12.5px; border-bottom: 1px solid var(--line); }
+.codes div:last-child { border-bottom: 0; }
+.codes .c { font-variant-numeric: tabular-nums; font-weight: 600; }
+.codes small { color: var(--muted); }
+.params { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.params td { padding: 6px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+.params td:first-child { color: var(--muted); width: 44%; padding-right: 10px; }
+details.more > summary { cursor: pointer; color: var(--accent); font-weight: 500; font-size: 13px; }
+details.more p { font-size: 13px; color: var(--fg); margin: 8px 0 0; }
+.note { font-size: 11.5px; color: var(--muted); margin: 0; }
+.howto { display: flex; flex-direction: column; gap: 8px; font-size: 13px; }
+.howto div { display: grid; grid-template-columns: 22px minmax(0,1fr); gap: 8px; }
+.howto i { font-style: normal; font-family: var(--font-display); font-weight: 700; color: var(--accent); }
+
+.legend { background: var(--panel); color: var(--fg); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; box-shadow: 0 2px 10px rgba(0,0,0,.14); font-size: 12px; max-width: 250px; }
+.legend h3 { margin: 0 0 6px; font-family: var(--font-display); font-weight: 600; font-size: 14px; }
+.legend ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+.legend li { display: grid; grid-template-columns: 14px minmax(0,1fr) auto; gap: 7px; align-items: center; }
+.legend .sw { width: 14px; height: 11px; border-radius: 2px; }
+.legend .ct { color: var(--muted); font-variant-numeric: tabular-nums; }
+.loading { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); z-index: 500; pointer-events: none; font-family: var(--font-display); font-size: 16px; }
+
+.leaflet-container { font-family: var(--font-body); }
+.leaflet-container .leaflet-control-attribution { background: color-mix(in srgb, var(--panel) 85%, transparent); color: var(--muted); font-size: 11px; }
+.leaflet-container .leaflet-control-attribution a { color: var(--accent); }
+.leaflet-bar, .leaflet-touch .leaflet-bar, .leaflet-control-layers, .leaflet-touch .leaflet-control-layers { border: 1px solid var(--line); border-radius: 8px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,.12); }
+.leaflet-bar a, .leaflet-touch .leaflet-bar a { background: var(--panel); color: var(--fg); border-bottom-color: var(--line); }
+.leaflet-control-layers { background: var(--panel); color: var(--fg); }
+.leaflet-tooltip { background: var(--panel); color: var(--fg); border: 1px solid var(--line); border-radius: 7px; box-shadow: 0 4px 14px rgba(0,0,0,.16); font-size: 12.5px; }
+.leaflet-tooltip-top:before, .leaflet-tooltip-bottom:before, .leaflet-tooltip-left:before, .leaflet-tooltip-right:before { display: none; }
+.leaflet-tooltip b { font-family: var(--font-display); font-size: 14px; }
+
+@media (max-width: 900px) {
+  html, body { height: auto; }
+  .app { display: flex; flex-direction: column; height: auto; }
+  .mapwrap { order: -1; height: 60vh; min-height: 360px; }
+  .panel { border-right: 0; border-top: 1px solid var(--line); overflow: visible; }
+  .inner { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  .legend { max-width: 190px; padding: 8px 10px; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="panel">
+    <div class="inner">
+      <header>
+        <h1>Usos del suelo y actividades CIIU de Garzón</h1>
+        <p>PBOT 2026–2039 · suelo urbano · mapas CU-11, CU-12 y CU-13 y fichas normativas</p>
+      </header>
+
+      <section>
+        <p class="eyebrow">Ver en el mapa</p>
+        <div class="seg" role="group" aria-label="Capa del mapa">
+          <button id="m-usos" type="button" aria-pressed="true">Usos del suelo</button>
+          <button id="m-trat" type="button" aria-pressed="false">Tratamientos</button>
+        </div>
+      </section>
+
+      <section class="search">
+        <label class="eyebrow" for="q">¿Dónde se permite una actividad?</label>
+        <input id="q" type="search" autocomplete="off" placeholder="Código CIIU o actividad. Ej.: 5630, panadería, taller…">
+        <div class="results" id="res" hidden></div>
+        <div id="ciiu-sel" hidden></div>
+      </section>
+
+      <section class="search">
+        <label class="eyebrow" for="qb">Ir a un barrio</label>
+        <input id="qb" type="search" autocomplete="off" placeholder="Nombre del barrio">
+        <div class="results" id="resb" hidden></div>
+      </section>
+
+      <section class="card" id="card" aria-live="polite"></section>
+    </div>
+  </aside>
+  <main class="mapwrap">
+    <div id="map" aria-label="Mapa del suelo urbano de Garzón"></div>
+    <div class="loading" id="loading">Cargando la norma urbana…</div>
+  </main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+(function () {
+  const COL_USO = {
+    'RESIDENCIAL': '#f1cf5e', 'DOTACIONAL': '#5d8fd0', 'ESPACIO PUBLICO': '#93cf7f', 'PROTECCION': '#3e8a57',
+    'COMERCIAL Y DE SERVICIOS EJE VIAL 1': '#e0634f', 'COMERCIAL Y DE SERVICIOS EJE VIAL 2': '#ee9a7c', 'COMERCIAL Y DE SERVICIOS EJE VIAL 3': '#c94f6d',
+    'COMERCIO Y SERVICIOS CENTRO HISTORICO': '#8f3b2e', 'COMERCIO Y SERVICIOS CENTRO DE LA CIUDAD': '#d97a3a',
+    'COMERCIAL ALTO IMPACTO': '#a61e8c', 'COMERCIO Y SERVICIOS': '#f0a35e'
+  };
+  const NOM_USO = {
+    'RESIDENCIAL': 'Residencial', 'DOTACIONAL': 'Dotacional', 'ESPACIO PUBLICO': 'Espacio público', 'PROTECCION': 'Protección',
+    'COMERCIAL Y DE SERVICIOS EJE VIAL 1': 'Comercial y servicios Eje Vial 1', 'COMERCIAL Y DE SERVICIOS EJE VIAL 2': 'Comercial y servicios Eje Vial 2',
+    'COMERCIAL Y DE SERVICIOS EJE VIAL 3': 'Comercial y servicios Eje Vial 3', 'COMERCIO Y SERVICIOS CENTRO HISTORICO': 'Centro Histórico',
+    'COMERCIO Y SERVICIOS CENTRO DE LA CIUDAD': 'Centro de la Ciudad', 'COMERCIAL ALTO IMPACTO': 'Zona Rosa (alto impacto)', 'COMERCIO Y SERVICIOS': 'Comercio y servicios'
+  };
+  const COL_TRAT = { 'Consolidacion': '#e6c26a', 'Desarrollo': '#f19a52', 'Mejoramiento Integral': '#dc5f4e', 'Renovacion Urbana': '#8f5fd6', 'Protección': '#2f9c86', 'Conservacion Historica': '#8a6a5c' };
+  const NOM_TRAT = { 'Consolidacion': 'Consolidación', 'Desarrollo': 'Desarrollo', 'Mejoramiento Integral': 'Mejoramiento integral', 'Renovacion Urbana': 'Renovación urbana', 'Protección': 'Protección', 'Conservacion Historica': 'Conservación histórica' };
+  const CATS = [
+    { k: 'principal', t: 'Principal', tok: '--ok' }, { k: 'complementario', t: 'Complementario', tok: '--comp' },
+    { k: 'condicionado', t: 'Condicionado', tok: '--cond' }, { k: 'prohibido', t: 'Prohibido', tok: '--no' }, { k: 'mixto', t: 'Según grupo o escala', tok: '--mix' }
+  ];
+  const NOM_USO_GRAL = { R: 'Vivienda (residencial)', D: 'Dotacional', P: 'Protección', CS: 'Comercio y servicios' };
+  const NF = new Intl.NumberFormat('es-CO', { maximumFractionDigits: 2 });
+
+  let C = {};
+  const readTokens = () => { const s = getComputedStyle(document.documentElement); CATS.forEach(c => C[c.tok] = s.getPropertyValue(c.tok).trim()); };
+  readTokens();
+
+  const state = { mode: 'usos', ciiu: null, pt: null };
+  let N, USOS, TRAT, ACT, BAR, LIM, map, usosL, tratL, barL, limL, legend, marker;
+  const GR = {};          // código -> [grupos]
+  const DESC = {};        // código -> descripción
+
+  /* ---------- Norma ---------- */
+  function resolver(code, f) {
+    const lists = ['principal', 'complementario', 'prohibido'];
+    for (const l of lists) if (f[l].includes(code)) return [{ cat: l, via: 'código ' + code }];
+    const out = [];
+    (GR[code] || []).forEach(g => {
+      const parent = g.startsWith('CAI-') ? 'CAI' : null;
+      let cat = null, via = g;
+      for (const l of lists) if (f[l].includes(g)) { cat = l; break; }
+      if (!cat && parent) for (const l of lists) if (f[l].includes(parent)) { cat = l; via = g + ' (grupo ' + parent + ')'; break; }
+      if (!cat) cat = 'condicionado';
+      if (!out.some(o => o.cat === cat)) out.push({ cat, via });
+    });
+    return out.length ? out : [{ cat: 'condicionado', via: '' }];
+  }
+  const verdictOf = r => r.length > 1 ? 'mixto' : r[0].cat;
+  const fichaDeUso = p => N.fichas[p.ficha];
+
+  /* ---------- Geometría ---------- */
+  function inRing(x, y, ring) { let c = false; for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) { const [xi, yi] = ring[i], [xj, yj] = ring[j]; if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) c = !c; } return c; }
+  function inFeat(lng, lat, f) { return f.geometry.coordinates.some(poly => inRing(lng, lat, poly[0]) && !poly.slice(1).some(h => inRing(lng, lat, h))); }
+  const hit = (fc, ll) => fc.features.find(f => inFeat(ll.lng, ll.lat, f));
+
+  /* ---------- Estilos ---------- */
+  function fillUso(p) {
+    if (state.ciiu) return C[CATS.find(c => c.k === verdictOf(resolver(state.ciiu, fichaDeUso(p)))).tok];
+    return COL_USO[p.cat] || '#ccc';
+  }
+  function styleUsos(f) {
+    const on = state.mode === 'usos' || state.ciiu;
+    return { stroke: true, color: '#ffffff', weight: 0.6, opacity: on ? .9 : 0, fill: on, fillColor: fillUso(f.properties), fillOpacity: state.ciiu ? .78 : .72 };
+  }
+  function styleTrat(f) {
+    const on = state.mode === 'trat' && !state.ciiu;
+    return { stroke: true, color: on ? '#ffffff' : '#2b3330', weight: on ? 0.8 : 0, opacity: on ? .9 : 0, fill: on, fillColor: COL_TRAT[f.properties.det] || '#ccc', fillOpacity: .7 };
+  }
+  function restyle() {
+    usosL.setStyle(styleUsos); tratL.setStyle(styleTrat);
+    usosL.eachLayer(l => l.options.interactive = state.mode === 'usos' || !!state.ciiu);
+    tratL.eachLayer(l => l.options.interactive = state.mode === 'trat' && !state.ciiu);
+    renderLegend();
+  }
+
+  function renderLegend() {
+    const el = legend.getContainer();
+    let title, items;
+    if (state.ciiu) {
+      const cnt = {}, ha = {};
+      USOS.features.forEach(f => { const v = verdictOf(resolver(state.ciiu, fichaDeUso(f.properties))); cnt[v] = (cnt[v] || 0) + 1; ha[v] = (ha[v] || 0) + f.properties.ha; });
+      title = 'CIIU ' + state.ciiu;
+      items = CATS.filter(c => cnt[c.k]).map(c => ({ c: C[c.tok], t: c.t, n: NF.format(ha[c.k]) + ' ha' }));
+    } else if (state.mode === 'usos') {
+      const ha = {}; USOS.features.forEach(f => ha[f.properties.cat] = (ha[f.properties.cat] || 0) + f.properties.ha);
+      title = 'Usos del suelo (CU-13)';
+      items = Object.keys(COL_USO).filter(k => ha[k]).map(k => ({ c: COL_USO[k], t: NOM_USO[k], n: NF.format(ha[k]) + ' ha' }));
+    } else {
+      title = 'Tratamientos (CU-11)';
+      items = TRAT.features.map(f => ({ c: COL_TRAT[f.properties.det], t: NOM_TRAT[f.properties.det] || f.properties.det, n: NF.format(f.properties.ha) + ' ha' }));
+    }
+    el.innerHTML = `<h3>${title}</h3><ul>${items.map(i => `<li><span class="sw" style="background:${i.c}"></span><span>${i.t}</span><span class="ct">${i.n}</span></li>`).join('')}</ul>`;
+  }
+
+  /* ---------- Panel ---------- */
+  const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  function tokenLabel(t) {
+    if (/^\d{4}$/.test(t)) return t + ' ' + (DESC[t] || '');
+    if (NOM_USO_GRAL[t]) return NOM_USO_GRAL[t] + ' (' + t + ')';
+    return t + ' · ' + (N.grupos[t] || N.grupos[t.replace('KA', 'Ka')] || '');
+  }
+
+  function renderHome() {
+    document.getElementById('card').innerHTML = `
+      <div><p class="eyebrow" style="margin:0 0 4px">Cómo consultar</p><h2>Haga clic en el mapa</h2></div>
+      <div class="howto">
+        <div><i>1</i><span>Toque cualquier punto del casco urbano para ver su uso del suelo, el tratamiento, la ficha normativa que aplica y todos los códigos CIIU principales, complementarios, condicionados y prohibidos.</span></div>
+        <div><i>2</i><span>Escriba un código o una actividad en el buscador para pintar el mapa según dónde esa actividad es principal, complementaria, condicionada o prohibida.</span></div>
+      </div>
+      <p class="note">Regla de aplicación: en los sectores con ficha propia (S1 a S7) manda esa ficha; en las demás zonas, la ficha del tratamiento urbanístico (F1 a F5). Los usos «condicionados» son «todos los demás» que la ficha no menciona.</p>`;
+  }
+
+  function renderPoint() {
+    const ll = state.pt; if (!ll) return renderHome();
+    const u = hit(USOS, ll), t = hit(TRAT, ll), a = hit(ACT, ll), b = hit(BAR, ll);
+    const card = document.getElementById('card');
+    if (!u) {
+      card.innerHTML = `<div><p class="eyebrow" style="margin:0 0 4px">Punto seleccionado</p><h2>Fuera de las zonas de uso</h2></div><p class="sub">Este punto no cae dentro de un polígono del mapa CU-13 (puede ser vía, fuera del perímetro urbano o un vacío del mapa).${t ? ' Tratamiento: ' + esc(NOM_TRAT[t.properties.det] || t.properties.det) + '.' : ''}</p><button class="linkbtn" type="button" id="clear">Volver</button>`;
+      document.getElementById('clear').onclick = clearPoint; return;
+    }
+    const p = u.properties;
+    const tdet = t ? t.properties.det : p.trat;
+    const fid = N.relacion.categoria[p.cat] || N.relacion.tratamiento[tdet] || p.ficha;
+    const f = N.fichas[fid];
+    // clasificar todos los códigos
+    const B = { principal: [], complementario: [], condicionado: [], prohibido: [] };
+    Object.keys(DESC).sort().forEach(code => resolver(code, f).forEach(r => B[r.cat].push({ code, via: r.via, mixed: resolver(code, f).length > 1 })));
+    let verdict = '';
+    if (state.ciiu) {
+      const r = resolver(state.ciiu, f), v = verdictOf(r), cat = CATS.find(c => c.k === v);
+      verdict = `<div class="verdict" style="background:${C[cat.tok]}"><b>${state.ciiu} · ${cat.t.toUpperCase()}</b><span>${esc(DESC[state.ciiu])}</span>${r.length > 1 ? `<span>${r.map(x => CATS.find(c => c.k === x.cat).t + ' como ' + esc(x.via)).join(' · ')}</span>` : (r[0].via ? `<span>Por ${esc(r[0].via)} en la ficha ${fid}</span>` : '')}</div>`;
+    }
+    const nonCiiu = l => f[l].filter(x => NOM_USO_GRAL[x]).map(x => `<span class="chip">${esc(NOM_USO_GRAL[x])}</span>`).join('');
+    const bucket = (k, title, open) => {
+      const cat = CATS.find(c => c.k === k), list = B[k];
+      const chips = k === 'condicionado' ? `<span class="chip">${esc((f.condicionado || 'Todos los demás').toLowerCase().replace(/^./, m => m.toUpperCase()))}</span>` :
+        f[k].map(x => `<span class="chip" title="${esc(tokenLabel(x))}">${esc(/^\d{4}$/.test(x) ? x : (NOM_USO_GRAL[x] ? NOM_USO_GRAL[x] : x + ' · ' + (N.grupos[x] || '')))}</span>`).join('');
+      return `<details class="bucket"${open ? ' open' : ''}><summary><span class="dot" style="background:${C[cat.tok]}"></span><span class="t">${title}</span><span class="n">${list.length} códigos</span></summary>
+        <div class="chips">${chips || '<span class="chip">Ninguno</span>'}</div>
+        <div class="codes">${list.map(x => `<div><span class="c">${x.code}</span><span>${esc(DESC[x.code])}${x.mixed ? ` <small>· como ${esc(x.via)}</small>` : ''}</span></div>`).join('') || '<div><span></span><small>Sin códigos CIIU en esta categoría</small></div>'}</div></details>`;
+    };
+    const tipo = a && a.properties.aa ? a.properties.aa.toLowerCase().replace(/^./, m => m.toUpperCase()) : '—';
+    card.innerHTML = `
+      <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start">
+        <div><p class="eyebrow" style="margin:0 0 4px">${b && b.properties.bar ? 'Barrio ' + esc(b.properties.bar) : 'Punto seleccionado'}</p><h2>${esc(NOM_USO[p.cat] || p.cat)}</h2>${p.nom && p.nom.trim() ? `<div class="sub">${esc(p.nom)}</div>` : ''}</div>
+        <button class="linkbtn" type="button" id="clear">Cerrar</button>
+      </div>
+      ${verdict}
+      <dl class="kv">
+        <dt>Uso del suelo (CU-13)</dt><dd>${esc(NOM_USO[p.cat] || p.cat)}</dd>
+        <dt>Área de actividad (CU-12)</dt><dd>${esc(tipo)}</dd>
+        <dt>Tratamiento (CU-11)</dt><dd>${esc(NOM_TRAT[tdet] || tdet || '—')}</dd>
+      </dl>
+      <div class="ficha-tag"><b>${fid}</b><span><strong>${esc(f.titulo)}</strong><br><span class="sub">${N.relacion.categoria[p.cat] ? 'Ficha del sector' : 'Ficha del tratamiento urbanístico'} · uso principal: ${esc(NOM_USO_GRAL[f.uso.cod] || f.uso.nom)}</span></span></div>
+      ${nonCiiu('complementario') ? `<p class="note">Además admite como complementario: ${f.complementario.filter(x => NOM_USO_GRAL[x]).map(x => NOM_USO_GRAL[x]).join(', ')}.</p>` : ''}
+      ${(() => { const miss = ['principal', 'complementario', 'prohibido'].flatMap(l => f[l]).filter(x => /^\d{4}$/.test(x) && !DESC[x]); return miss.length ? `<p class="note">La ficha ${fid} menciona ${miss.length > 1 ? 'los códigos' : 'el código'} ${miss.join(', ')}, que no ${miss.length > 1 ? 'están' : 'está'} en la tabla CIIU del PBOT.</p>` : ''; })()}
+      <div style="display:flex;flex-direction:column;gap:8px">
+        ${bucket('principal', 'Usos principales', true)}
+        ${bucket('complementario', 'Usos complementarios', false)}
+        ${bucket('condicionado', 'Usos condicionados', false)}
+        ${bucket('prohibido', 'Usos prohibidos', false)}
+      </div>
+      ${f.parametros.length ? `<div><p class="eyebrow">Norma urbanística · ficha ${fid}</p><table class="params"><tbody>${f.parametros.map(r => `<tr><td>${esc(r[0])}</td><td>${esc(r[1])}</td></tr>`).join('')}</tbody></table></div>` : ''}
+      ${f.descripcion ? `<details class="more"><summary>Descripción de la ficha</summary><p>${esc(f.descripcion)}</p></details>` : ''}
+      ${f.tratamiento ? `<details class="more"><summary>Tratamiento urbanístico</summary><p>${esc(f.tratamiento)}</p></details>` : ''}`;
+    document.getElementById('clear').onclick = clearPoint;
+  }
+  function clearPoint() { state.pt = null; if (marker) { map.removeLayer(marker); marker = null; } renderHome(); }
+
+  function renderCiiuSel() {
+    const el = document.getElementById('ciiu-sel');
+    if (!state.ciiu) { el.hidden = true; return; }
+    el.hidden = false;
+    el.innerHTML = `<div class="sel-ciiu"><div><b>${state.ciiu}</b> <span>${esc(DESC[state.ciiu])}</span><br><span class="sub">Grupo: ${GR[state.ciiu].map(g => g + ' · ' + (N.grupos[g] || '')).join(' / ')}</span></div><button class="linkbtn" type="button" id="ciiu-x">Quitar</button></div>`;
+    document.getElementById('ciiu-x').onclick = () => { state.ciiu = null; document.getElementById('q').value = ''; renderCiiuSel(); restyle(); renderPoint(); };
+  }
+
+  /* ---------- Buscadores ---------- */
+  const norm = s => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  function makeSearch(input, box, source, onPick) {
+    let hits = [], act = -1;
+    const run = () => {
+      const t = norm(input.value.trim());
+      if (t.length < 2) { box.hidden = true; return; }
+      hits = source(t).slice(0, 40); act = -1;
+      box.innerHTML = hits.length ? '' : '<div class="note" style="padding:8px 10px">Sin resultados</div>';
+      hits.forEach((h, i) => { const b = document.createElement('button'); b.type = 'button'; b.innerHTML = h.html; b.onclick = () => pick(i); box.appendChild(b); });
+      box.hidden = false;
+    };
+    const pick = i => { const h = hits[i]; if (!h) return; box.hidden = true; input.value = h.label; onPick(h); };
+    input.addEventListener('input', run);
+    input.addEventListener('keydown', e => {
+      if (box.hidden) return;
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); act = Math.max(0, Math.min(hits.length - 1, act + (e.key === 'ArrowDown' ? 1 : -1))); [...box.querySelectorAll('button')].forEach((b, i) => b.classList.toggle('on', i === act)); }
+      else if (e.key === 'Enter') { e.preventDefault(); pick(act < 0 ? 0 : act); }
+      else if (e.key === 'Escape') box.hidden = true;
+    });
+    document.addEventListener('click', e => { if (!e.target.closest('.search')) box.hidden = true; });
+  }
+
+  /* ---------- Mapa ---------- */
+  map = L.map('map', { preferCanvas: true, zoomSnap: 0.25, zoomControl: false, minZoom: 12, maxZoom: 19 });
+  map.attributionControl.setPrefix(false);
+  map.attributionControl.addAttribution('Cartografía: PBOT Garzón 2026–2039');
+  const BASES = {
+    'Calles': L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' }),
+    'Satélite': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: 'Imágenes &copy; Esri' }),
+    'Sin fondo': L.layerGroup()
+  };
+  BASES['Calles'].addTo(map);
+  L.control.zoom({ position: 'topright', zoomInTitle: 'Acercar', zoomOutTitle: 'Alejar' }).addTo(map);
+  L.control.layers(BASES, null, { position: 'topright' }).addTo(map);
+  L.control.scale({ position: 'bottomright', imperial: false }).addTo(map);
+  map.setView([2.197, -75.627], 14);
+
+  document.getElementById('m-usos').onclick = () => setMode('usos');
+  document.getElementById('m-trat').onclick = () => setMode('trat');
+  function setMode(m) {
+    state.mode = m;
+    document.getElementById('m-usos').setAttribute('aria-pressed', String(m === 'usos'));
+    document.getElementById('m-trat').setAttribute('aria-pressed', String(m === 'trat'));
+    restyle();
+  }
+
+  const onTheme = () => { readTokens(); if (usosL) { restyle(); renderPoint(); } };
+  try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', onTheme); } catch (e) {}
+  new MutationObserver(onTheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+  Promise.all(['norma.json', 'usos.json', 'tratamientos.json', 'actividad.json', 'barrios.json', 'limites.json'].map(u => fetch(u).then(r => { if (!r.ok) throw new Error(u); return r.json(); })))
+    .then(([n, u, t, a, b, l]) => {
+      N = n; USOS = u; TRAT = t; ACT = a; BAR = b; LIM = l;
+      N.ciiu.forEach(([c, d, g]) => { (GR[c] = GR[c] || []).includes(g) || GR[c].push(g); DESC[c] = DESC[c] || d; });
+      const renderer = L.canvas({ padding: 0.4, tolerance: 3 });
+      tratL = L.geoJSON(TRAT, { renderer, style: styleTrat, onEachFeature: (f, l) => l.bindTooltip(() => `<b>${esc(NOM_TRAT[f.properties.det] || f.properties.det)}</b><br>${NF.format(f.properties.ha)} ha`, { sticky: true, direction: 'top', offset: [0, -8] }) }).addTo(map);
+      usosL = L.geoJSON(USOS, { renderer, style: styleUsos, onEachFeature: (f, l) => l.bindTooltip(() => {
+        const p = f.properties; let s = `<b>${esc(NOM_USO[p.cat] || p.cat)}</b>${p.nom && p.nom.trim() ? '<br>' + esc(p.nom) : ''}<br>Ficha ${p.ficha}`;
+        if (state.ciiu) { const v = verdictOf(resolver(state.ciiu, fichaDeUso(p))); s += ` · CIIU ${state.ciiu}: <b>${CATS.find(c => c.k === v).t.toLowerCase()}</b>`; }
+        return s; }, { sticky: true, direction: 'top', offset: [0, -8] }) }).addTo(map);
+      barL = L.geoJSON(BAR, { renderer, interactive: false, style: { color: '#33403a', weight: 0.7, opacity: .55, fill: false, dashArray: '3 3' } }).addTo(map);
+      limL = L.geoJSON(LIM, { renderer, interactive: false, style: f => ({ color: f.properties.tipo.startsWith('Per') ? '#1d2420' : '#7a4fa8', weight: 2.2, opacity: .9, fill: false, dashArray: f.properties.tipo.startsWith('Per') ? null : '8 5' }) }).addTo(map);
+      map.fitBounds(limL.getBounds(), { padding: [12, 12] });
+      map.setMaxBounds(limL.getBounds().pad(0.8));
+      legend = L.control({ position: 'bottomleft' });
+      legend.onAdd = () => { const d = L.DomUtil.create('div', 'legend'); L.DomEvent.disableClickPropagation(d); return d; };
+      legend.addTo(map);
+      map.on('click', e => {
+        state.pt = e.latlng;
+        if (marker) marker.setLatLng(e.latlng); else marker = L.circleMarker(e.latlng, { radius: 7, color: '#fff', weight: 2.5, fillColor: '#1d2420', fillOpacity: 1, interactive: false }).addTo(map);
+        renderPoint();
+        if (window.innerWidth <= 900) document.getElementById('card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+      makeSearch(document.getElementById('q'), document.getElementById('res'), t => {
+        const out = [];
+        Object.keys(DESC).forEach(c => { const k = norm(c + ' ' + DESC[c]); if (k.includes(t)) out.push({ code: c, score: c.startsWith(t) ? 0 : 1 }); });
+        return out.sort((a, b) => a.score - b.score || a.code.localeCompare(b.code)).map(o => ({ code: o.code, label: o.code + ' ' + DESC[o.code], html: `<span class="c">${o.code}</span><span>${esc(DESC[o.code])}</span><small>${GR[o.code].join('/')}</small>` }));
+      }, h => { state.ciiu = h.code; renderCiiuSel(); restyle(); renderPoint(); });
+      makeSearch(document.getElementById('qb'), document.getElementById('resb'), t =>
+        BAR.features.filter(f => f.properties.bar && norm(f.properties.bar).includes(t)).map(f => ({ f, label: f.properties.bar, html: `<span class="c"></span><span>${esc(f.properties.bar)}</span><small>Barrio</small>` })),
+        h => { const l = L.geoJSON(h.f); map.flyToBounds(l.getBounds(), { padding: [40, 40], maxZoom: 17, duration: .6 }); });
+      document.getElementById('loading').hidden = true;
+      restyle(); renderHome();
+    })
+    .catch(err => { document.getElementById('loading').textContent = 'No se pudieron cargar las capas. Recargue la página.'; console.error(err); });
+})();
+</script>
+</body>
+</html>
